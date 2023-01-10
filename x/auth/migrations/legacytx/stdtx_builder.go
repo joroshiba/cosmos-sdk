@@ -77,6 +77,10 @@ func (s *StdTxBuilder) SetFeeGranter(_ sdk.AccAddress) {}
 // SetFeePayer does nothing for stdtx
 func (s *StdTxBuilder) SetFeePayer(_ sdk.AccAddress) {}
 
+func (s *StdTxBuilder) SetSecondaryChainID(id string) {
+	panic("secondary chain-ids not supported by legacy tx builder")
+}
+
 // AddAuxSignerData returns an error for StdTxBuilder.
 func (s *StdTxBuilder) AddAuxSignerData(_ tx.AuxSignerData) error {
 	return sdkerrors.ErrLogic.Wrap("cannot use AuxSignerData with StdTxBuilder")

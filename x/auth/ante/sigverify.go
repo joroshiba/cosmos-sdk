@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
@@ -247,6 +248,10 @@ func (svd SigVerificationDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simul
 
 	signerAddrs := sigTx.GetSigners()
 
+	// set the secondary chain-id. This will be the zero value of a string if
+	// not set. This should only be the case for non-native transactions
+	secondaryChainID := sigTx.GetSecondaryChainID()
+
 	// check that signer length and signature length are the same
 	if len(sigs) != len(signerAddrs) {
 		return ctx, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "invalid number of signer;  expected: %d, got %d", len(signerAddrs), len(sigs))
@@ -264,20 +269,35 @@ func (svd SigVerificationDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simul
 			return ctx, sdkerrors.Wrap(sdkerrors.ErrInvalidPubKey, "pubkey on account is not set")
 		}
 
+		currentSequence := acc.GetSequence()
+		// if there was a secondary chainid, then we need to use the secondary
+		// sequence for that chain-id
+		if secondaryChainID != "" {
+			currentSequence = acc.GetSecondarySequence(secondaryChainID)
+		}
+
 		// Check account sequence number.
-		if sig.Sequence != acc.GetSequence() {
+		if sig.Sequence != currentSequence {
 			return ctx, sdkerrors.Wrapf(
 				sdkerrors.ErrWrongSequence,
-				"account sequence mismatch, expected %d, got %d", acc.GetSequence(), sig.Sequence,
+				"account sequence mismatch, expected %d, got %d", currentSequence, sig.Sequence,
 			)
 		}
 
 		// retrieve signer data
 		genesis := ctx.BlockHeight() == 0
 		chainID := ctx.ChainID()
+		if secondaryChainID != "" {
+			chainID = strings.Join([]string{chainID, secondaryChainID}, "|")
+		}
 		var accNum uint64
 		if !genesis {
 			accNum = acc.GetAccountNumber()
+			// we don't support account numbers for other chains, as its
+			// impossible to prune state.
+			if secondaryChainID != "" {
+				accNum = 0
+			}
 		}
 		signerData := authsigning.SignerData{
 			Address:       acc.GetAddress().String(),
@@ -295,7 +315,7 @@ func (svd SigVerificationDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simul
 				if OnlyLegacyAminoSigners(sig.Data) {
 					// If all signers are using SIGN_MODE_LEGACY_AMINO, we rely on VerifySignature to check account sequence number,
 					// and therefore communicate sequence number as a potential cause of error.
-					errMsg = fmt.Sprintf("signature verification failed; please verify account number (%d), sequence (%d) and chain-id (%s)", accNum, acc.GetSequence(), chainID)
+					errMsg = fmt.Sprintf("signature verification failed; please verify account number (%d), sequence (%d) and chain-id (%s)", accNum, currentSequence, chainID)
 				} else {
 					errMsg = fmt.Sprintf("signature verification failed; please verify account number (%d) and chain-id (%s)", accNum, chainID)
 				}
@@ -333,11 +353,20 @@ func (isd IncrementSequenceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, sim
 		return ctx, sdkerrors.Wrap(sdkerrors.ErrTxDecode, "invalid transaction type")
 	}
 
+	secondaryChainID := sigTx.GetSecondaryChainID()
+
+
 	// increment sequence of all signers
 	for _, addr := range sigTx.GetSigners() {
 		acc := isd.ak.GetAccount(ctx, addr)
-		if err := acc.SetSequence(acc.GetSequence() + 1); err != nil {
-			panic(err)
+		if secondaryChainID != "" {
+			if err := acc.SetSecondarySequence(secondaryChainID, acc.GetSecondarySequence(secondaryChainID)+1); err != nil {
+				panic(err)
+			}
+		} else {
+			if err := acc.SetSequence(acc.GetSequence() + 1); err != nil {
+				panic(err)
+			}
 		}
 
 		isd.ak.SetAccount(ctx, acc)

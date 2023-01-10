@@ -119,6 +119,21 @@ func (acc *BaseAccount) SetSequence(seq uint64) error {
 	return nil
 }
 
+// GetSecondarySequence - Implements sdk.AccountI.
+func (acc BaseAccount) GetSecondarySequence(id string) uint64 {
+	return acc.SecondarySequence[id]
+}
+
+// SetSecondarySequence - Implements sdk.AccountI.
+func (acc *BaseAccount) SetSecondarySequence(id string, seq uint64) error {
+	// todo: properly fix the unmarshalling so that we don't have to perform this check
+	if acc.SecondarySequence == nil {
+		acc.SecondarySequence = make(map[string]uint64)
+	}
+	acc.SecondarySequence[id] = seq
+	return nil
+}
+
 // Validate checks for errors on the account fields
 func (acc BaseAccount) Validate() error {
 	if acc.Address == "" || acc.PubKey == nil {
