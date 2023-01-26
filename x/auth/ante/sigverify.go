@@ -369,6 +369,7 @@ func (isd IncrementSequenceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, sim
 			if err := acc.SetSecondarySequence(secondaryChainID, acc.GetSecondarySequence(secondaryChainID)+1); err != nil {
 				panic(err)
 			}
+		}
 
 		isd.ak.SetAccount(ctx, acc)
 	}
