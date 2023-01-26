@@ -167,6 +167,12 @@ func (w *wrapper) GetTimeoutHeight() uint64 {
 	return w.tx.Body.TimeoutHeight
 }
 
+// GetSecondaryChainID returns the secondary chain id in the authentication
+// info. This is the zero value for native transactions.
+func (w *wrapper) GetSecondaryChainID() string {
+	return w.tx.AuthInfo.SecondaryChainId
+}
+
 func (w *wrapper) GetSignaturesV2() ([]signing.SignatureV2, error) {
 	signerInfos := w.tx.AuthInfo.SignerInfos
 	sigs := w.tx.Signatures
@@ -304,6 +310,12 @@ func (w *wrapper) SetSignatures(signatures ...signing.SignatureV2) error {
 	w.setSignatures(rawSigs)
 
 	return nil
+}
+
+// SetSecondaryChainID sets the secondary chain id in the authentication info.
+// This is the zero value for native transactions.
+func (w *wrapper) SetSecondaryChainID(id string) {
+	w.tx.AuthInfo.SecondaryChainId = id
 }
 
 func (w *wrapper) setSignerInfos(infos []*tx.SignerInfo) {
